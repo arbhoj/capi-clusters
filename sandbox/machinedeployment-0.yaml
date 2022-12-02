@@ -10,7 +10,7 @@ spec:
   clusterName: abhojdkp-dkp
   minReadySeconds: 0
   progressDeadlineSeconds: 600
-  replicas: 5
+  replicas: 4
   revisionHistoryLimit: 1
   selector:
     matchLabels:
