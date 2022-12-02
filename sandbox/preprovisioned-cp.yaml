@@ -9,7 +9,7 @@ metadata:
 spec:
   hosts:
     # Create as many of these as needed to match your infrastructure
-  - address: 18.237.158.81
+  - address: 34.211.55.102
   sshConfig:
     port: 22
     # This is the username used to connect to your infrastructure. This user must be root or
