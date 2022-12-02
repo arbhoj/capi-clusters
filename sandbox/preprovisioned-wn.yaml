@@ -10,6 +10,7 @@ spec:
   - address: 18.236.223.140
   - address: 54.189.33.30
   - address: 34.212.200.207
+  - addreess: 54.202.92.194
   sshConfig:
     port: 22
     user: core
