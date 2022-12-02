@@ -6,10 +6,10 @@ metadata:
   namespace: default
 spec:
   hosts:
-  - address: 34.210.18.250 
-  - address: 34.221.44.218
-  - address: 35.89.62.28
-  - address: 54.187.164.223
+  - address: 54.213.54.116 
+  - address: 34.221.4.207
+  - address: 34.219.7.200
+  - address: 35.91.23.113
   sshConfig:
     port: 22
     user: core
