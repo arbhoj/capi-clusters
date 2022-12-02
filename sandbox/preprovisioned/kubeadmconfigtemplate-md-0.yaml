@@ -1,0 +1,81 @@
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: abhojdkp-dkp-md-0
+  namespace: default
+spec:
+  template:
+    spec:
+      files:
+      - content: |
+          #!/bin/bash
+          # CAPI does not expose an API to modify KubeProxyConfiguration
+          # this is a workaround to use a script with preKubeadmCommand to modify the kubeadm config files
+          # https://github.com/kubernetes-sigs/cluster-api/issues/4512
+          for i in $(ls /run/kubeadm/ | grep 'kubeadm.yaml\|kubeadm-join-config.yaml'); do
+            cat <<EOF>> "/run/kubeadm//$i"
+          ---
+          kind: KubeProxyConfiguration
+          apiVersion: kubeproxy.config.k8s.io/v1alpha1
+          metricsBindAddress: "0.0.0.0:10249"
+          EOF
+          done
+        path: /run/kubeadm/konvoy-set-kube-proxy-configuration.sh
+        permissions: "0700"
+      - content: |
+          [metrics]
+            address = "0.0.0.0:1338"
+            grpc_histogram = false
+        path: /etc/containerd/konvoy-conf.d/konvoy-metrics.toml
+        permissions: "0644"
+      - content: |
+          #!/bin/bash
+          set -euo pipefail
+          IFS=$'\n\t'
+
+          if ! ctr --namespace k8s.io images check "name==docker.io/mesosphere/toml-merge:v0.1.0" | grep "docker.io/mesosphere/toml-merge:v0.1.0" >/dev/null; then
+            ctr --namespace k8s.io images pull "docker.io/mesosphere/toml-merge:v0.1.0"
+          fi
+
+          cleanup() {
+            ctr images unmount "${tmp_ctr_mount_dir}" || true
+          }
+
+          trap 'cleanup' EXIT
+
+          readonly tmp_ctr_mount_dir="$(mktemp -d)"
+
+          ctr --namespace k8s.io images mount docker.io/mesosphere/toml-merge:v0.1.0 "${tmp_ctr_mount_dir}"
+          "${tmp_ctr_mount_dir}/usr/local/bin/toml-merge" -i --patch-file "/etc/containerd/konvoy-conf.d/*.toml" /etc/containerd/config.toml
+        path: /run/konvoy/containerd-apply-patches.sh
+        permissions: "0700"
+      - content: |
+          #!/bin/bash
+          systemctl restart containerd
+
+          SECONDS=0
+          until crictl info; do
+            if ((SECONDS > 60)); then
+              echo "Containerd is not running. Giving up..."
+              exit 1
+            fi
+            echo "Containerd is not running yet. Waiting..."
+            sleep 5
+          done
+        path: /run/konvoy/restart-containerd-and-wait.sh
+        permissions: "0700"
+      format: cloud-config
+      joinConfiguration:
+        discovery: {}
+        nodeRegistration:
+          criSocket: /run/containerd/containerd.sock
+          kubeletExtraArgs:
+            cloud-provider: "aws"
+            provider-id: '{{ .ProviderID }}'
+            volume-plugin-dir: /opt/libexec/kubernetes/kubelet-plugins/volume/exec/
+      preKubeadmCommands:
+      - /run/kubeadm/konvoy-set-kube-proxy-configuration.sh
+      - /run/konvoy/containerd-apply-patches.sh
+      - systemctl daemon-reload
+      - /run/konvoy/restart-containerd-and-wait.sh

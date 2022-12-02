@@ -1,0 +1,18 @@
+---
+apiVersion: infrastructure.cluster.konvoy.d2iq.io/v1alpha1
+kind: PreprovisionedInventory
+metadata:
+  name: abhojdkp-dkp-md-0
+  namespace: default
+spec:
+  hosts:
+  - address: 35.92.17.35
+  - address: 35.92.15.146
+  - address: 34.222.100.182
+  - address: 34.211.55.241
+  sshConfig:
+    port: 22
+    user: core
+    privateKeyRef:
+      name: abhojdkp-dkp-ssh-key
+      namespace: default

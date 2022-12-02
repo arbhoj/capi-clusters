@@ -1,0 +1,22 @@
+---
+apiVersion: infrastructure.cluster.konvoy.d2iq.io/v1alpha1
+kind: PreprovisionedInventory
+metadata:
+  name: abhojdkp-dkp-control-plane
+  namespace: default
+  labels:
+    cluster.x-k8s.io/cluster-name: abhojdkp-dkp
+spec:
+  hosts:
+    # Create as many of these as needed to match your infrastructure
+  - address: 18.237.158.81
+  sshConfig:
+    port: 22
+    # This is the username used to connect to your infrastructure. This user must be root or
+    # have the ability to use sudo without a password
+    user: core
+    privateKeyRef:
+      # This is the name of the secret you created in the previous step. It must exist in the same
+      # namespace as this inventory object.
+      name: abhojdkp-dkp-ssh-key
+      namespace: default

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cluster.yaml
+  - clusterresourceset-calico.yaml
+  - clusterresourceset-localvolumeprovisioner.yaml
+  - clusterresourceset-metallb.yaml
+  - clusterresourceset-node-feature-discovery.yaml
+  - key.yaml
+  - kubeadmconfigtemplate-md-0.yaml
+  - kubeadmcontrolplane.yaml
+  - machinedeployment-0.yaml
+  - preprovisioned-cp.yaml
+  - preprovisioned-wn.yaml
+  - preprovisionedmachinetemplate-cp.yaml
+  - preprovisionedmachinetemplate-md-0.yaml

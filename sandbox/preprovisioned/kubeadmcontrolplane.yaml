@@ -1,0 +1,309 @@
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: KubeadmControlPlane
+metadata:
+  name: abhojdkp-dkp-control-plane
+  namespace: default
+spec:
+  kubeadmConfigSpec:
+    clusterConfiguration:
+      apiServer:
+        extraArgs:
+          audit-log-maxage: "30"
+          audit-log-maxbackup: "10"
+          audit-log-maxsize: "100"
+          audit-log-path: /var/log/audit/kube-apiserver-audit.log
+          audit-policy-file: /etc/kubernetes/audit-policy/apiserver-audit-policy.yaml
+          cloud-provider: "aws"
+          encryption-provider-config: /etc/kubernetes/pki/encryption-config.yaml
+        extraVolumes:
+        - hostPath: /etc/kubernetes/audit-policy/
+          mountPath: /etc/kubernetes/audit-policy/
+          name: audit-policy
+        - hostPath: /var/log/kubernetes/audit
+          mountPath: /var/log/audit/
+          name: audit-logs
+      controllerManager:
+        extraArgs:
+          cloud-provider: "aws"
+          flex-volume-plugin-dir: /opt/libexec/kubernetes/kubelet-plugins/volume/exec/
+      dns: {}
+      etcd:
+        local:
+          imageTag: 3.4.13-0
+      networking: {}
+      scheduler: {}
+    files:
+    - content: |
+        # Taken from https://github.com/kubernetes/kubernetes/blob/master/cluster/gce/gci/configure-helper.sh
+        # Recommended in Kubernetes docs
+        apiVersion: audit.k8s.io/v1
+        kind: Policy
+        rules:
+          # The following requests were manually identified as high-volume and low-risk,
+          # so drop them.
+          - level: None
+            users: ["system:kube-proxy"]
+            verbs: ["watch"]
+            resources:
+              - group: "" # core
+                resources: ["endpoints", "services", "services/status"]
+          - level: None
+            # Ingress controller reads 'configmaps/ingress-uid' through the unsecured port.
+            # TODO(#46983): Change this to the ingress controller service account.
+            users: ["system:unsecured"]
+            namespaces: ["kube-system"]
+            verbs: ["get"]
+            resources:
+              - group: "" # core
+                resources: ["configmaps"]
+          - level: None
+            users: ["kubelet"] # legacy kubelet identity
+            verbs: ["get"]
+            resources:
+              - group: "" # core
+                resources: ["nodes", "nodes/status"]
+          - level: None
+            userGroups: ["system:nodes"]
+            verbs: ["get"]
+            resources:
+              - group: "" # core
+                resources: ["nodes", "nodes/status"]
+          - level: None
+            users:
+              - system:kube-controller-manager
+              - system:kube-scheduler
+              - system:serviceaccount:kube-system:endpoint-controller
+            verbs: ["get", "update"]
+            namespaces: ["kube-system"]
+            resources:
+              - group: "" # core
+                resources: ["endpoints"]
+          - level: None
+            users: ["system:apiserver"]
+            verbs: ["get"]
+            resources:
+              - group: "" # core
+                resources: ["namespaces", "namespaces/status", "namespaces/finalize"]
+          - level: None
+            users: ["cluster-autoscaler"]
+            verbs: ["get", "update"]
+            namespaces: ["kube-system"]
+            resources:
+              - group: "" # core
+                resources: ["configmaps", "endpoints"]
+          # Don't log HPA fetching metrics.
+          - level: None
+            users:
+              - system:kube-controller-manager
+            verbs: ["get", "list"]
+            resources:
+              - group: "metrics.k8s.io"
+          # Don't log these read-only URLs.
+          - level: None
+            nonResourceURLs:
+              - /healthz*
+              - /version
+              - /swagger*
+          # Don't log events requests.
+          - level: None
+            resources:
+              - group: "" # core
+                resources: ["events"]
+          # node and pod status calls from nodes are high-volume and can be large, don't log responses for expected updates from nodes
+          - level: Request
+            users: ["kubelet", "system:node-problem-detector", "system:serviceaccount:kube-system:node-problem-detector"]
+            verbs: ["update","patch"]
+            resources:
+              - group: "" # core
+                resources: ["nodes/status", "pods/status"]
+            omitStages:
+              - "RequestReceived"
+          - level: Request
+            userGroups: ["system:nodes"]
+            verbs: ["update","patch"]
+            resources:
+              - group: "" # core
+                resources: ["nodes/status", "pods/status"]
+            omitStages:
+              - "RequestReceived"
+          # deletecollection calls can be large, don't log responses for expected namespace deletions
+          - level: Request
+            users: ["system:serviceaccount:kube-system:namespace-controller"]
+            verbs: ["deletecollection"]
+            omitStages:
+              - "RequestReceived"
+          # Secrets, ConfigMaps, and TokenReviews can contain sensitive & binary data,
+          # so only log at the Metadata level.
+          - level: Metadata
+            resources:
+              - group: "" # core
+                resources: ["secrets", "configmaps"]
+              - group: authentication.k8s.io
+                resources: ["tokenreviews"]
+            omitStages:
+              - "RequestReceived"
+          # Get responses can be large; skip them.
+          - level: Request
+            verbs: ["get", "list", "watch"]
+            resources:
+              - group: "" # core
+              - group: "admissionregistration.k8s.io"
+              - group: "apiextensions.k8s.io"
+              - group: "apiregistration.k8s.io"
+              - group: "apps"
+              - group: "authentication.k8s.io"
+              - group: "authorization.k8s.io"
+              - group: "autoscaling"
+              - group: "batch"
+              - group: "certificates.k8s.io"
+              - group: "extensions"
+              - group: "metrics.k8s.io"
+              - group: "networking.k8s.io"
+              - group: "node.k8s.io"
+              - group: "policy"
+              - group: "rbac.authorization.k8s.io"
+              - group: "scheduling.k8s.io"
+              - group: "settings.k8s.io"
+              - group: "storage.k8s.io"
+            omitStages:
+              - "RequestReceived"
+          # Default level for known APIs
+          - level: RequestResponse
+            resources:
+              - group: "" # core
+              - group: "admissionregistration.k8s.io"
+              - group: "apiextensions.k8s.io"
+              - group: "apiregistration.k8s.io"
+              - group: "apps"
+              - group: "authentication.k8s.io"
+              - group: "authorization.k8s.io"
+              - group: "autoscaling"
+              - group: "batch"
+              - group: "certificates.k8s.io"
+              - group: "extensions"
+              - group: "metrics.k8s.io"
+              - group: "networking.k8s.io"
+              - group: "node.k8s.io"
+              - group: "policy"
+              - group: "rbac.authorization.k8s.io"
+              - group: "scheduling.k8s.io"
+              - group: "settings.k8s.io"
+              - group: "storage.k8s.io"
+            omitStages:
+              - "RequestReceived"
+          # Default level for all other requests.
+          - level: Metadata
+            omitStages:
+              - "RequestReceived"
+      path: /etc/kubernetes/audit-policy/apiserver-audit-policy.yaml
+      permissions: "0600"
+    - content: |
+        #!/bin/bash
+        # CAPI does not expose an API to modify KubeProxyConfiguration
+        # this is a workaround to use a script with preKubeadmCommand to modify the kubeadm config files
+        # https://github.com/kubernetes-sigs/cluster-api/issues/4512
+        for i in $(ls /run/kubeadm/ | grep 'kubeadm.yaml\|kubeadm-join-config.yaml'); do
+          cat <<EOF>> "/run/kubeadm//$i"
+        ---
+        kind: KubeProxyConfiguration
+        apiVersion: kubeproxy.config.k8s.io/v1alpha1
+        metricsBindAddress: "0.0.0.0:10249"
+        EOF
+        done
+      path: /run/kubeadm/konvoy-set-kube-proxy-configuration.sh
+      permissions: "0700"
+    - content: |
+        [metrics]
+          address = "0.0.0.0:1338"
+          grpc_histogram = false
+      path: /etc/containerd/konvoy-conf.d/konvoy-metrics.toml
+      permissions: "0644"
+    - content: |
+        #!/bin/bash
+        set -euo pipefail
+        IFS=$'\n\t'
+
+        if ! ctr --namespace k8s.io images check "name==docker.io/mesosphere/toml-merge:v0.1.0" | grep "docker.io/mesosphere/toml-merge:v0.1.0" >/dev/null; then
+          ctr --namespace k8s.io images pull "docker.io/mesosphere/toml-merge:v0.1.0"
+        fi
+
+        cleanup() {
+          ctr images unmount "${tmp_ctr_mount_dir}" || true
+        }
+
+        trap 'cleanup' EXIT
+
+        readonly tmp_ctr_mount_dir="$(mktemp -d)"
+
+        ctr --namespace k8s.io images mount docker.io/mesosphere/toml-merge:v0.1.0 "${tmp_ctr_mount_dir}"
+        "${tmp_ctr_mount_dir}/usr/local/bin/toml-merge" -i --patch-file "/etc/containerd/konvoy-conf.d/*.toml" /etc/containerd/config.toml
+      path: /run/konvoy/containerd-apply-patches.sh
+      permissions: "0700"
+    - content: |
+        #!/bin/bash
+        systemctl restart containerd
+
+        SECONDS=0
+        until crictl info; do
+          if ((SECONDS > 60)); then
+            echo "Containerd is not running. Giving up..."
+            exit 1
+          fi
+          echo "Containerd is not running yet. Waiting..."
+          sleep 5
+        done
+      path: /run/konvoy/restart-containerd-and-wait.sh
+      permissions: "0700"
+    - contentFrom:
+        secret:
+          key: value
+          name: abhojdkp-dkp-etcd-encryption-config
+      owner: root:root
+      path: /etc/kubernetes/pki/encryption-config.yaml
+      permissions: "0640"
+    format: cloud-config
+    initConfiguration:
+      localAPIEndpoint: {}
+      nodeRegistration:
+        criSocket: /run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cloud-provider: "aws"
+          provider-id: '{{ .ProviderID }}'
+          volume-plugin-dir: /opt/libexec/kubernetes/kubelet-plugins/volume/exec/
+    joinConfiguration:
+      discovery: {}
+      nodeRegistration:
+        criSocket: /run/containerd/containerd.sock
+        kubeletExtraArgs:
+          cloud-provider: "aws"
+          provider-id: '{{ .ProviderID }}'
+          volume-plugin-dir: /opt/libexec/kubernetes/kubelet-plugins/volume/exec/
+    preKubeadmCommands:
+    - /run/kubeadm/konvoy-set-kube-proxy-configuration.sh
+    - /run/konvoy/containerd-apply-patches.sh
+    - systemctl daemon-reload
+    - /run/konvoy/restart-containerd-and-wait.sh
+  machineTemplate:
+    infrastructureRef:
+      apiVersion: infrastructure.cluster.konvoy.d2iq.io/v1alpha1
+      kind: PreprovisionedMachineTemplate
+      name: abhojdkp-dkp-control-plane
+      namespace: default
+    metadata: {}
+  replicas: 1
+  rolloutStrategy:
+    rollingUpdate:
+      maxSurge: 1
+    type: RollingUpdate
+  version: v1.24.6
+---
+apiVersion: infrastructure.cluster.konvoy.d2iq.io/v1alpha1
+kind: PreprovisionedCluster
+metadata:
+  name: abhojdkp-dkp
+  namespace: default
+spec:
+  controlPlaneEndpoint:
+    host: tf-lb-20221201222544933300000007-1824497247.us-west-2.elb.amazonaws.com
+    port: 6443

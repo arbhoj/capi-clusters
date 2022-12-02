@@ -1,0 +1,12 @@
+---
+apiVersion: infrastructure.cluster.konvoy.d2iq.io/v1alpha1
+kind: PreprovisionedMachineTemplate
+metadata:
+  name: abhojdkp-dkp-control-plane
+  namespace: default
+spec:
+  template:
+    spec:
+      inventoryRef:
+        name: abhojdkp-dkp-control-plane
+        namespace: default
