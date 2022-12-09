@@ -1,0 +1,44 @@
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  labels:
+    cluster.x-k8s.io/cluster-name: dkp-demo
+  name: dkp-demo-md-0
+  namespace: default
+  ownerReferences:
+  - apiVersion: cluster.x-k8s.io/v1beta1
+    kind: Cluster
+    name: dkp-demo
+    uid: 9ba8c10f-1189-4e5b-bf98-9cd76680492c
+spec:
+  clusterName: dkp-demo
+  minReadySeconds: 0
+  progressDeadlineSeconds: 600
+  replicas: 4
+  revisionHistoryLimit: 1
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/cluster-name: dkp-demo
+      cluster.x-k8s.io/deployment-name: dkp-demo-md-0
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        cluster.x-k8s.io/cluster-name: dkp-demo
+        cluster.x-k8s.io/deployment-name: dkp-demo-md-0
+    spec:
+      bootstrap:
+        configRef:
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+          name: dkp-demo-md-0
+      clusterName: dkp-demo
+      infrastructureRef:
+        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        kind: VSphereMachineTemplate
+        name: dkp-demo-md-0
+      version: v1.23.12
